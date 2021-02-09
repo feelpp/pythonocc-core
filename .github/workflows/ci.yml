@@ -30,14 +30,14 @@ jobs:
       name: Build 
       run: |
         mkdir build && cd build
-        cmake -G Ninja -DCMAKE_INSTALL_PREFIX=$PREFIX \
+        cmake -DCMAKE_INSTALL_PREFIX=$PWD/install/ \
           -DPYTHONOCC_BUILD_TYPE=Release \
-          -DCMAKE_PREFIX_PATH=$PREFIX \
-          -DCMAKE_SYSTEM_PREFIX_PATH=$PREFIX \
+          -DCMAKE_PREFIX_PATH=/usr \
+          -DCMAKE_SYSTEM_PREFIX_PATH=/usr \
           -DPython3_FIND_STRATEGY=LOCATION \
           -DPython3_FIND_FRAMEWORK=NEVER \
           -DSWIG_HIDE_WARNINGS=ON \
-        .
+        ..
         make -j10
         make install
 
