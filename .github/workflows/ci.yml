@@ -1,0 +1,95 @@
+name: CI
+
+on: 
+  push:
+
+
+jobs:
+
+  activate:
+    runs-on: ubuntu-latest
+    if: |
+      github.repository == 'feelpp/pythonocc-core' &&
+      !startsWith(github.event.head_commit.message, 'Release ') &&
+      !contains(github.event.head_commit.message, 'ci skip')
+    steps:
+    - run: echo ok go
+
+  build:
+    runs-on: ubuntu-20.04
+    needs: activate
+    steps:
+    - uses: actions/checkout@v2
+
+    - 
+      name: Update ubuntu
+      run: |
+        sudo apt update
+        sudo apt-get install git cmake gcc g++ libboost1.67-all-dev python3-all-dev swig libpcre3-dev libxml2-dev
+        sudo apt-get install liboce-foundation-dev liboce-modeling-dev liboce-ocaf-dev liboce-visualization-dev liboce-ocaf-lite-dev
+    - 
+      name: Build 
+      run: |
+        mkdir build && cd build
+        cmake -G Ninja -DCMAKE_INSTALL_PREFIX=$PREFIX \
+          -DPYTHONOCC_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH=$PREFIX \
+          -DCMAKE_SYSTEM_PREFIX_PATH=$PREFIX \
+          -DPython3_FIND_STRATEGY=LOCATION \
+          -DPython3_FIND_FRAMEWORK=NEVER \
+          -DSWIG_HIDE_WARNINGS=ON \
+        .
+        make -j10
+        make install
+
+    -   
+      name: Package
+      run: |
+        make package
+      working-directory: build
+    - name: Upload 
+      uses: actions/upload-artifact@v2
+      with:
+        # Artifact name
+        name: pyocc-artifacts
+        # Directory containing files to upload
+        path: build/assets/*
+
+  deliver:
+    runs-on: ubuntu-20.04
+    needs: build
+    name: Docker Build, Tag, Push
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        lfs: true
+    
+    - name: Download 
+      uses: actions/download-artifact@v2
+      with:
+        # Artifact name
+        name: pyocc-artifacts
+        path: artifacts/
+    -
+      name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+    -
+      name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1        
+    - 
+      name: Login to GitHub Container Registry
+      uses: docker/login-action@v1 
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.CR_PAT }}
+    - 
+      name: Build container image
+      uses: docker/build-push-action@v2
+      with: 
+        context: artifacts
+        repository: feelpp/pythonocc-core
+        tags: ghcr.io/feelpp/pythonocc-core:latest
+        file: ./Dockerfile
+        push: true
